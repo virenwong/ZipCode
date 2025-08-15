@@ -21,8 +21,8 @@
   <script>
   async function getZipFromIP() {
     try {
-      // Free IP geolocation API (no API key needed)
-      const geoRes = await fetch("https://ipapi.co/json/");
+      // More reliable free IP geolocation API
+      const geoRes = await fetch("https://ipinfo.io/json?token=YOUR_IPINFO_TOKEN");
       const geoData = await geoRes.json();
       return geoData.postal || null;
     } catch (err) {
@@ -70,4 +70,10 @@
       resDiv.innerHTML = `<p>Detected ZIP: ${zip}. Fetching Census data...</p>`;
       fetchCensusData(zip);
     } else {
-      resDiv.innerHTML = '<p class="error"
+      resDiv.innerHTML = '<p class="error">Could not detect your ZIP code.</p>';
+    }
+  })();
+  </script>
+</body>
+</html>
+
