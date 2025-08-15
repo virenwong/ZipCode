@@ -3,90 +3,71 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>ZIP Code Insights: Census + Housing</title>
+  <title>Your ZIP Code Census Data</title>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f4f4; color: #333; padding: 2rem; max-width: 600px; margin: auto; }
     h1 { text-align: center; margin-bottom: 1.5rem; }
-    form { display: flex; justify-content: center; margin-bottom: 1rem; }
-    input, button { padding: 0.5rem; font-size: 1rem; margin: 0 0.5rem; }
-    button { cursor: pointer; background: #0066cc; color: white; border: none; border-radius: 4px; }
     .results { background: #fff; padding: 1.5rem; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
     .section { margin-bottom: 1rem; }
     .error { color: red; }
   </style>
 </head>
 <body>
-  <h1>ZIP Code Insights</h1>
-  <form id="zipForm">
-    <input type="text" id="zipInput" placeholder="Enter ZIP code" maxlength="5" required/>
-    <button type="submit">Get Data</button>
-  </form>
-  <div id="results" class="results"></div>
+  <h1>Your Census Data</h1>
+  <div id="results" class="results">
+    <p>Detecting your location...</p>
+  </div>
 
   <script>
-  document.getElementById('zipForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const zip = document.getElementById('zipInput').value.trim();
-    const resDiv = document.getElementById('results');
-    resDiv.innerHTML = '';
-
-    if (!/^[0-9]{5}$/.test(zip)) {
-      resDiv.innerHTML = '<p class="error">Please enter a valid 5-digit ZIP code.</p>';
-      return;
-    }
-    resDiv.innerHTML = '<p>Loading data...</p>';
-
+  async function getZipFromIP() {
     try {
-      // 1. Census Data (Population & Income)
-      const censusKey = 'YOUR_CENSUS_API_KEY';
-      const censusUrl = `https://api.census.gov/data/2021/acs/acs5?get=NAME,B01003_001E,B19013_001E&for=zip%20code%20tabulation%20area:${zip}&key=${censusKey}`;
-      const censusRes = await fetch(censusUrl);
-      const censusData = await censusRes.json();
-      let html = '';
+      // Free IP geolocation API (no API key needed)
+      const geoRes = await fetch("https://ipapi.co/json/");
+      const geoData = await geoRes.json();
+      return geoData.postal || null;
+    } catch (err) {
+      console.error("Geo API error:", err);
+      return null;
+    }
+  }
 
-      if (censusData.length >= 2) {
-        const [ , [place, pop, income] ] = censusData;
-        html += `<div class="section"><h2>${place}</h2>
-                 <p><strong>Population:</strong> ${Number(pop).toLocaleString()}</p>
-                 <p><strong>Median Income:</strong> $${Number(income).toLocaleString()}</p></div>`;
+  async function fetchCensusData(zip) {
+    const resDiv = document.getElementById('results');
+    try {
+      const censusKey = '9b922ba186beb6bba0c82eb87ddb182798303bcc'; // Get from https://api.census.gov/data/key_signup.html
+
+      const url = `https://api.census.gov/data/2021/acs/acs5?get=NAME,B01002_001E,B25010_001E,B15003_001E,B15003_022E,B15003_023E,B15003_024E,B15003_025E&for=zip%20code%20tabulation%20area:${zip}&key=${censusKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.length >= 2) {
+        const [ , [place, medianAge, householdSize, eduTotal, bach, master, prof, doctor] ] = data;
+
+        const bachPlus = Number(bach) + Number(master) + Number(prof) + Number(doctor);
+        const eduPercent = eduTotal > 0 ? ((bachPlus / Number(eduTotal)) * 100).toFixed(1) : 'N/A';
+
+        resDiv.innerHTML = `
+          <div class="section">
+            <h2>${place}</h2>
+            <p><strong>ZIP Code:</strong> ${zip}</p>
+            <p><strong>Median Age:</strong> ${Number(medianAge).toFixed(1)}</p>
+            <p><strong>Average Household Size:</strong> ${Number(householdSize).toFixed(2)}</p>
+            <p><strong>Bachelor's Degree or Higher:</strong> ${eduPercent}%</p>
+          </div>`;
       } else {
-        html += `<p class="error">Census data not found for ZIP ${zip}.</p>`;
+        resDiv.innerHTML = `<p class="error">No data found for ZIP ${zip}.</p>`;
       }
-
-      // 2. Zillow Home Value (ZHVI) via Economics Data API
-      {
-        const zid = 'YOUR_ZILLOW_API_ID'; // register for access
-        const econUrl = `https://api.bridgedataoutput.com/econ/metrics?region=zip:${zip}&metric=zhvi`;
-        const econRes = await fetch(econUrl, { headers: { 'Authorization': `Bearer ${zid}` } });
-        if (econRes.ok) {
-          const econ = await econRes.json();
-          if (econ.data && econ.data.length) {
-            const latest = econ.data[0];
-            html += `<div class="section"><h3>Home Value (ZHVI)</h3>
-                     <p><strong>Typical Home Value:</strong> $${Number(latest.value).toLocaleString()}</p></div>`;
-          }
-        }
-      }
-
-      // 3. RentCast API as alternative for housing stats
-      {
-        const rentKey = 'YOUR_RENTCAST_API_KEY';
-        const rcUrl = `https://api.rentcast.io/market/zip/${zip}`;
-        const rcRes = await fetch(rcUrl, { headers: { 'x-api-key': rentKey } });
-        if (rcRes.ok) {
-          const rc = await rcRes.json();
-          html += `<div class="section"><h3>RentCast Market Info</h3>
-                   <p><strong>Avg Sale Price:</strong> $${rc.avgSalePrice?.toLocaleString() || 'N/A'}</p>
-                   <p><strong>Avg Rent:</strong> $${rc.avgRent?.toLocaleString() || 'N/A'}</p></div>`;
-        }
-      }
-
-      resDiv.innerHTML = html || '<p class="error">No housing data available.</p>';
     } catch (err) {
       console.error(err);
-      resDiv.innerHTML = '<p class="error">Error fetching data. Try again later.</p>';
+      resDiv.innerHTML = '<p class="error">Error fetching census data.</p>';
     }
-  });
-  </script>
-</body>
-</html>
+  }
+
+  (async () => {
+    const resDiv = document.getElementById('results');
+    const zip = await getZipFromIP();
+    if (zip) {
+      resDiv.innerHTML = `<p>Detected ZIP: ${zip}. Fetching Census data...</p>`;
+      fetchCensusData(zip);
+    } else {
+      resDiv.innerHTML = '<p class="error"
