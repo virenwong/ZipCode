@@ -21,7 +21,7 @@
   <script>
   async function getZipFromIP() {
     try {
-      // More reliable free IP geolocation API
+      // Replace with your own IPinfo token
       const geoRes = await fetch("https://ipinfo.io/json?token=YOUR_IPINFO_TOKEN");
       const geoData = await geoRes.json();
       return geoData.postal || null;
@@ -34,7 +34,7 @@
   async function fetchCensusData(zip) {
     const resDiv = document.getElementById('results');
     try {
-      const censusKey = '9b922ba186beb6bba0c82eb87ddb182798303bcc'; // Get from https://api.census.gov/data/key_signup.html
+      const censusKey = '9b922ba186beb6bba0c82eb87ddb182798303bcc';
 
       const url = `https://api.census.gov/data/2021/acs/acs5?get=NAME,B01002_001E,B25010_001E,B15003_001E,B15003_022E,B15003_023E,B15003_024E,B15003_025E&for=zip%20code%20tabulation%20area:${zip}&key=${censusKey}`;
       const res = await fetch(url);
@@ -76,4 +76,3 @@
   </script>
 </body>
 </html>
-
